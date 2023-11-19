@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5300
@@ -11,7 +11,7 @@ app.use(express.json())
 
 
 const uri = `mongodb+srv://${process.env.MONGODB_UnAME}:${process.env.MONGODB_PASS}@cluster0.kx3y6hq.mongodb.net/?retryWrites=true&w=majority`;
-console.log(uri);
+
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
     serverApi: {
@@ -26,10 +26,54 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
-        const carExperCollections = client.db("carExpertsDB").collection("caerExperts");
+        const serviceCollections = client.db("carExpertDB").collection("services");
+        const appoinmentCollections = client.db("appoinmentDB").collection("appoinments");
 
+        app.get("/services", async (req, res) => {
+            let services = await serviceCollections.find().toArray();
+            res.send(services);
+        })
 
+        app.get("/services/:id", async (req, res) => {
+            let id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const options = {
+                projection: { title: 1, img: 1 },
+            }
+            let service = await serviceCollections.findOne(query, options);
+            res.send(service)
+        })
 
+        //appoinmentCollections
+        app.post('/appoinments', async (req, res) => {
+            const body = req.body;
+            const result = await appoinmentCollections.insertOne(body);
+            res.send(result)
+        })
+
+        app.get("/appoinments", async (req, res) => {
+            let query = {}
+            if (req.query?.email) {
+                query = { email: req.query.email }
+            }
+            console.log('query', query)
+            let appoinments = await appoinmentCollections.find(query).toArray();
+            res.send(appoinments);
+        })
+
+        app.delete("/appoinments/:id", async (req, res) => {
+            let id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const deleteResult = await appoinmentCollections.deleteOne(filter);
+            res.send(deleteResult)
+        })
+
+        app.patch("/appoinments/:id", async (req, res) => {
+            const updateQuery = { _id: new ObjectId(req.params.id) }
+            const updatedData = { $set: { status: req.body.status } };
+            const updateResult = await appoinmentCollections.updateOne(updateQuery, updatedData);
+            res.send(updateResult)
+        })
 
 
         // Send a ping to confirm a successful connection
