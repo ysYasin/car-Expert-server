@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require("dotenv").config();
 const app = express();
@@ -20,6 +21,25 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+
+// varify jwt
+const verifyJwt = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(400).send({ error: true, message: "authorization faild" })
+    }
+    const token = authorization.split(' ')[1];
+
+    jwt.verify(token, process.env.JWT_Token, (err, decoded) => {
+        if (err) {
+            return res.status(400).send({ error: true, message: "jwt tocken arror" })
+        }
+        req.decoded = decoded;
+        next();
+    });
+
+
+}
 
 async function run() {
     try {
@@ -51,12 +71,17 @@ async function run() {
             res.send(result)
         })
 
-        app.get("/appoinments", async (req, res) => {
+        app.get("/appoinments", verifyJwt, async (req, res) => {
+            if (req.decoded.email !== req.query.email) {
+                return res.status(400).send({
+                    error: true,
+                    message: "your email is not same that you login with!"
+                })
+            }
             let query = {}
             if (req.query?.email) {
                 query = { email: req.query.email }
             }
-            console.log('query', query)
             let appoinments = await appoinmentCollections.find(query).toArray();
             res.send(appoinments);
         })
@@ -73,6 +98,14 @@ async function run() {
             const updatedData = { $set: { status: req.body.status } };
             const updateResult = await appoinmentCollections.updateOne(updateQuery, updatedData);
             res.send(updateResult)
+        })
+
+
+        //jwt
+        app.post("/jwt", (req, res) => {
+            const user = req.body;
+            const tocken = jwt.sign(user, process.env.JWT_Token, { expiresIn: "7d" });
+            res.send({ tocken });
         })
 
 
